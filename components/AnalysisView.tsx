@@ -26,23 +26,36 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
       reader.readAsDataURL(file);
     }
   };
-
-  const handleAnalyze = async () => {
-    if (!imagePreview) return;
+  
+   const handleAnalyze = async () => {
+  if (!imagePreview) return;
+  
+  setIsAnalyzing(true);
+  try {
+    // Extract base64 data without prefix
+    const base64Data = imagePreview.split(',')[1];
     
-    setIsAnalyzing(true);
-    try {
-      // Extract base64 data without prefix for API
-      const base64Data = imagePreview.split(',')[1];
-      const data = await analyzePetImage(base64Data, category);
-      setResult(data);
-    } catch (error) {
-      console.error("Analysis failed", error);
-      alert("Something went wrong with the analysis. Please try again.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+    // Call YOUR serverless function instead of Gemini directly
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        image: base64Data, 
+        category: category 
+      })
+    });
+
+    if (!response.ok) throw new Error('Analysis failed');
+    
+    const data = await response.json();
+    setResult(data);
+  } catch (error) {
+    console.error("Analysis failed", error);
+    alert("Something went wrong with the analysis. Please try again.");
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {

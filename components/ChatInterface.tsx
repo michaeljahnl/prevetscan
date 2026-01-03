@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { streamChatResponse } from '../services/geminiService';
+
 import { ChatMessage } from '../types';
 import ReactMarkdown from 'react-markdown';
 import Button from './Button';
@@ -45,12 +45,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSend = async (e?: React.FormEvent) => {
+const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if ((!input.trim() && !attachedImage) || isLoading) return;
 
     const currentImage = attachedImage;
-    // Clear attachment immediately
     setAttachedImage(null);
 
     const userMessage: ChatMessage = {
@@ -75,35 +74,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
     }]);
 
     try {
-      // Prepare history for API (Gemini expects parts)
-      const history = messages.map(m => {
-        const parts: any[] = [{ text: m.text }];
-        if (m.image) {
-          // Send previously shared images in history as simple placeholders or omit if heavy,
-          // but for context, text description is usually enough unless using cached content.
-          // For simplicity in this stream, we often just send text history, but ideally:
-           parts.push({ text: "[Image uploaded]" });
-        }
-        return {
-          role: m.role,
-          parts: parts
-        };
-      });
+      const history = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
 
-      // Pass the *raw* image data (base64 without prefix) to the service for the NEW message
       const imageForService = currentImage ? currentImage.split(',')[1] : null;
 
-      const stream = streamChatResponse(history, userMessage.text || (currentImage ? "Analyze this image." : ""), imageForService, isThinkingMode);
+      // Call YOUR serverless function
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          history,
+          message: userMessage.text || "Analyze this image.",
+          image: imageForService,
+          useDeepThinking: isThinkingMode
+        })
+      });
 
+      if (!response.ok) throw new Error('Chat failed');
+
+      // Read the streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       let fullResponse = '';
-      
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-        setMessages(prev => prev.map(msg => 
-          msg.id === tempId 
-            ? { ...msg, text: fullResponse, isThinking: false } 
-            : msg
-        ));
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          fullResponse += chunk;
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === tempId 
+              ? { ...msg, text: fullResponse, isThinking: false } 
+              : msg
+          ));
+        }
       }
 
     } catch (error) {
