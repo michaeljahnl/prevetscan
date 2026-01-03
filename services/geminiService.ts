@@ -104,7 +104,7 @@ export const streamChatResponse = async function* (
       model: 'gemini-3-pro-preview',
       history: history,
       config: {
-        systemInstruction: `You are 'Between Vet Visits' AI. 
+        systemInstruction: `You are 'Pre Vet Scan' AI. 
         
         CORE MISSION: You are an UNBIASED Second Opinion. 
         Unlike insurance companies (Trupanion, etc.), you have no financial incentive to deny claims or upsell treatments.

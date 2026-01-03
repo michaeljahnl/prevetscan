@@ -20,7 +20,7 @@ const App: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
               </div>
-              <span className="font-bold text-xl text-slate-800 tracking-tight">Between Vet Visits</span>
+              <span className="font-bold text-xl text-slate-800 tracking-tight">Pre Vet Scan</span>
             </div>
             <div className="flex items-center space-x-2">
               <button 
@@ -89,7 +89,7 @@ const App: React.FC = () => {
                    </ul>
                 </div>
                 <div className="p-8 bg-teal-50/50">
-                   <h3 className="text-lg font-bold text-teal-800 mb-4 uppercase tracking-wider">Between Vet Visits</h3>
+                   <h3 className="text-lg font-bold text-teal-800 mb-4 uppercase tracking-wider">Pre Vet Scan</h3>
                    <ul className="space-y-4">
                      <li className="flex items-center text-slate-800 font-medium">
                        <svg className="w-5 h-5 mr-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
@@ -162,7 +162,7 @@ const App: React.FC = () => {
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 py-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="mb-2">© 2024 Between Vet Visits.</p>
+          <p className="mb-2">© 2024 Pre Vet Scan.</p>
           <p className="text-sm">
             Disclaimer: This tool provides information, not medical diagnosis. Always consult a veterinarian for medical advice.
           </p>

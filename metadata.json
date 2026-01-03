@@ -1,5 +1,5 @@
 {
-  "name": "Between Vet Visits",
+  "name": "Pre Vet Scan",
   "description": "AI-powered pet health screening and veterinary assistant. Detect issues early with visual analysis and deep-reasoning chat.",
   "requestFramePermissions": [
     "camera",
