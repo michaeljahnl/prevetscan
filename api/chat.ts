@@ -17,30 +17,30 @@ export default async function handler(req: Request) {
       return new Response('API key not configured', { status: 500 });
     }
 
-    const ai = new GoogleGenerativeAI( apiKey );
+    const ai = new GoogleGenerativeAI(apiKey);
 
-    const chat = ai.chats.create({
+    const model = ai.getGenerativeModel({ 
       model: 'gemini-2.5-flash',
-      history: history,
-      config: {
-        systemInstruction: `You are 'PreVetScan' AI. 
-        
-        CORE MISSION: You are an UNBIASED Second Opinion. 
-        Unlike insurance companies, you have no financial incentive to deny claims or upsell treatments.
-        
-        CAPABILITIES:
-        1. Symptom Triage: Analyze photos of pets to assess urgency.
-        2. QUOTE AUDITING: If the user uploads a vet bill or estimate, analyze line items. Flag vague charges, compare costs to regional averages.
-        3. Prevention ROI: Always highlight the cost of inaction.
+      systemInstruction: `You are 'PreVetScan' AI. 
 
-        If asked about treatment options, mention:
-        1. The conservative/preventative path.
-        2. The standard veterinary path.
-        3. The rough estimated costs of both.
-        
-        ALWAYS clarify that you are an AI and not a replacement for a real doctor.`,
-        thinkingConfig: useDeepThinking ? { thinkingBudget: 32768 } : undefined,
-      }
+CORE MISSION: You are an UNBIASED Second Opinion. 
+Unlike insurance companies, you have no financial incentive to deny claims or upsell treatments.
+
+CAPABILITIES:
+1. Symptom Triage: Analyze photos of pets to assess urgency.
+2. QUOTE AUDITING: If the user uploads a vet bill or estimate, analyze line items. Flag vague charges, compare costs to regional averages.
+3. Prevention ROI: Always highlight the cost of inaction.
+
+If asked about treatment options, mention:
+1. The conservative/preventative path.
+2. The standard veterinary path.
+3. The rough estimated costs of both.
+
+ALWAYS clarify that you are an AI and not a replacement for a real doctor.`
+    });
+
+    const chat = model.startChat({
+      history: history
     });
 
     // Prepare message with optional image
@@ -49,10 +49,10 @@ export default async function handler(req: Request) {
           { text: message },
           { inlineData: { mimeType: 'image/jpeg', data: image } }
         ]
-      : message;
+      : [{ text: message }];
 
     // Stream the response
-    const result = await chat.sendMessageStream({ message: messagePayload });
+    const result = await chat.sendMessageStream(messagePayload);
 
     // Create a streaming response
     const encoder = new TextEncoder();
