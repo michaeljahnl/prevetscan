@@ -20,7 +20,7 @@ export default async function handler(req: Request) {
     const ai = new GoogleGenAI({ apiKey });
 
     const chat = ai.chats.create({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       history: history,
       config: {
         systemInstruction: `You are 'PreVetScan' AI. 
