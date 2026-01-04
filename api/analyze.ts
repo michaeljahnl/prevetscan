@@ -55,14 +55,16 @@ CRITICAL: Act as a financial forecaster. Example: "Cleaning teeth now ($0-$300) 
       headers: { 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    console.error("Analysis failed:", error);
+} catch (error) {
+    console.error("Full error details:", error);
+    
     return new Response(
       JSON.stringify({ 
         error: 'Analysis failed',
-        message: error.message 
+        details: error.message,
+        errorType: error.constructor.name,
+        stack: error.stack?.substring(0, 500)
       }), 
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-}
