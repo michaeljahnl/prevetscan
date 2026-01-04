@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/generative-ai";
 
 export const config = {
   runtime: 'edge',
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
       return new Response('API key not configured', { status: 500 });
     }
 
-    const ai = new GoogleGenAI(apiKey);
+    const ai = new GoogleGenerativeAI( apiKey );
     const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `You are an expert veterinary AI assistant. Analyze this image of a pet's ${category}. 
