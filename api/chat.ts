@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const config = {
   runtime: 'edge',
@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
       return new Response('API key not configured', { status: 500 });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenerativeAI( apiKey );
 
     const chat = ai.chats.create({
       model: 'gemini-2.5-flash',
