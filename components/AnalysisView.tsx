@@ -69,53 +69,54 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
   };
 
   const exportToPDF = async () => {
-    const element = document.getElementById('analysis-content');
-    if (!element) return;
+  const element = document.getElementById('analysis-content');
+  if (!element) return;
 
-    // Better canvas rendering settings
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      logging: false,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      windowWidth: 1200,
-      windowHeight: element.scrollHeight
-    });
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    logging: false,
+    useCORS: true,
+    backgroundColor: '#ffffff'
+  });
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pdfWidth - 20; // 10mm margins
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    let heightLeft = imgHeight;
-    let position = 10; // Start 10mm from top
-    
-    // Add content (split across pages if needed)
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight;
-    
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight + 10;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-    }
-    
-    // Add footer to every page
-    const pageCount = pdf.internal.pages.length - 1;
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      pdf.setFontSize(8);
-      pdf.setTextColor(100);
-      pdf.text('PreVetScan.com - AI-powered pet health screening', pdfWidth / 2, pdfHeight - 10, { align: 'center' });
-      pdf.text(`Page ${i} of ${pageCount}`, pdfWidth - 20, pdfHeight - 10);
-    }
-    
-    pdf.save(`PreVetScan-Analysis-${Date.now()}.pdf`);
-  };
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  
+  const imgWidth = pageWidth - (2 * margin);
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  
+  const pageContentHeight = pageHeight - (2 * margin);
+  let heightLeft = imgHeight;
+  let position = 0;
+  
+  // First page
+  pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+  heightLeft -= pageContentHeight;
+  
+  // Additional pages
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', margin, position + margin, imgWidth, imgHeight);
+    heightLeft -= pageContentHeight;
+  }
+  
+  // Add footers to all pages
+  const totalPages = pdf.internal.pages.length - 1; // -1 because pages array includes a null first element
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    pdf.setFontSize(8);
+    pdf.setTextColor(100);
+    pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 5, { align: 'center' });
+    pdf.text(`${i}/${totalPages}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
+  }
+  
+  pdf.save(`PreVetScan-${Date.now()}.pdf`);
+};
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
