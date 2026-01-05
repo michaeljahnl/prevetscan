@@ -43,24 +43,30 @@ ALWAYS clarify that you are an AI and not a replacement for a real doctor.`
       history: history
     });
 
-    // Prepare message with optional image
+    // Prepare message with optional image - Fix type structure
     const messagePayload = image 
       ? [
           { text: message },
-          { inlineData: { mimeType: 'image/jpeg', data: image } }
+          { 
+            inlineData: { 
+              mimeType: 'image/jpeg' as const, 
+              data: image 
+            } 
+          }
         ]
-      : [{ text: message }];
+      : message; // Just send string if no image
 
     // Stream the response
     const result = await chat.sendMessageStream(messagePayload);
 
-    // Create a streaming response
+    // Create a streaming response - Access the stream correctly
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of result) {
-            controller.enqueue(encoder.encode(chunk.text));
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            controller.enqueue(encoder.encode(text));
           }
           controller.close();
         } catch (error) {
