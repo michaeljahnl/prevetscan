@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { HealthCategory, AnalysisResult } from '../types';
 import { analyzePetImage } from '../services/geminiService';
 import Button from './Button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface AnalysisViewProps {
   onBack: () => void;
@@ -21,41 +23,39 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setImagePreview(base64String);
-        setResult(null); // Reset previous result
+        setResult(null);
       };
       reader.readAsDataURL(file);
     }
   };
-  
-   const handleAnalyze = async () => {
-  if (!imagePreview) return;
-  
-  setIsAnalyzing(true);
-  try {
-    // Extract base64 data without prefix
-    const base64Data = imagePreview.split(',')[1];
-    
-    // Call YOUR serverless function instead of Gemini directly
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        image: base64Data, 
-        category: category 
-      })
-    });
 
-    if (!response.ok) throw new Error('Analysis failed');
+  const handleAnalyze = async () => {
+    if (!imagePreview) return;
     
-    const data = await response.json();
-    setResult(data);
-  } catch (error) {
-    console.error("Analysis failed", error);
-    alert("Something went wrong with the analysis. Please try again.");
-  } finally {
-    setIsAnalyzing(false);
-  }
-};
+    setIsAnalyzing(true);
+    try {
+      const base64Data = imagePreview.split(',')[1];
+      
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: base64Data, 
+          category: category 
+        })
+      });
+
+      if (!response.ok) throw new Error('Analysis failed');
+      
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      console.error("Analysis failed", error);
+      alert("Something went wrong with the analysis. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -66,6 +66,26 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
       case 'Critical': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const exportToPDF = async () => {
+    const element = document.getElementById('analysis-content');
+    if (!element) return;
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      logging: false,
+      useCORS: true
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`PreVetScan-Analysis-${Date.now()}.pdf`);
   };
 
   return (
@@ -159,36 +179,49 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Results Section */}
+        {/* Results Section - WRAPPED IN DIV FOR PDF EXPORT */}
         {result && (
           <div className="bg-slate-50 border-t border-slate-100 p-6 md:p-8 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-800">Analysis Report</h3>
-              <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getSeverityColor(result.severity)}`}>
-                Severity: {result.severity}
-              </span>
-            </div>
-            
-            <div className="space-y-4">
-              {/* Financial Forecast Card - Differentiator */}
+            <div id="analysis-content" className="space-y-6">
+              {/* PDF Export Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">PreVetScan Analysis Report</h3>
+                  <p className="text-xs text-slate-500 mt-1">Generated {new Date().toLocaleDateString()}</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getSeverityColor(result.severity)}`}>
+                  Severity: {result.severity}
+                </span>
+              </div>
+
+              {/* Pet Image in PDF */}
+              {imagePreview && (
+                <div className="bg-white p-4 rounded-lg">
+                  <img src={imagePreview} alt="Pet" className="max-h-48 mx-auto rounded-lg shadow-sm" />
+                </div>
+              )}
+              
+              {/* Financial Forecast Card */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-4 rounded-lg border border-teal-200 shadow-sm relative overflow-hidden">
                 <div className="relative z-10">
-                   <div className="flex items-center text-teal-800 font-semibold mb-1">
-                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                     </svg>
-                     Financial Forecast
-                   </div>
-                   <p className="text-teal-900 text-sm font-medium">{result.financialForecast}</p>
+                  <div className="flex items-center text-teal-800 font-semibold mb-1">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Financial Forecast
+                  </div>
+                  <p className="text-teal-900 text-sm font-medium">{result.financialForecast}</p>
                 </div>
                 <div className="absolute right-0 top-0 -mt-2 -mr-2 w-20 h-20 bg-teal-200 rounded-full opacity-20"></div>
               </div>
 
+              {/* Analysis Details */}
               <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                 <h4 className="font-semibold text-slate-900 mb-1">{result.title}</h4>
                 <p className="text-slate-600 text-sm leading-relaxed">{result.recommendation}</p>
               </div>
 
+              {/* Observations */}
               <div>
                 <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observations</h4>
                 <ul className="space-y-2">
@@ -203,7 +236,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                 </ul>
               </div>
 
-              <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mt-4">
+              {/* Disclaimer */}
+              <div className="bg-amber-50 border-l-4 border-amber-400 p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
@@ -211,12 +245,20 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm text-amber-700">
-                      {result.disclaimer}
-                    </p>
+                    <p className="text-sm text-amber-700">{result.disclaimer}</p>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* PDF Export Button - OUTSIDE the analysis-content div */}
+            <div className="mt-6 flex gap-3">
+              <Button onClick={exportToPDF} variant="secondary" className="flex-1">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                Download as PDF
+              </Button>
             </div>
           </div>
         )}
