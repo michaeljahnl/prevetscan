@@ -68,7 +68,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
     }
   };
 
-  const exportToPDF = async () => {
+ const exportToPDF = async () => {
   const element = document.getElementById('analysis-content');
   if (!element) return;
 
@@ -76,7 +76,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
     scale: 2,
     logging: false,
     useCORS: true,
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    windowHeight: element.scrollHeight
   });
 
   const imgData = canvas.toDataURL('image/png');
@@ -84,49 +85,61 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
   
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 15; // Increased from 10
-  const footerHeight = 15; // Space reserved for footer
   
-  const imgWidth = pageWidth - (2 * margin);
+  // Generous margins
+  const topMargin = 20;
+  const bottomMargin = 20;
+  const sideMargin = 15;
+  
+  const contentWidth = pageWidth - (2 * sideMargin);
+  const contentHeight = pageHeight - topMargin - bottomMargin;
+  
+  const imgWidth = contentWidth;
   const imgHeight = (canvas.height * imgWidth) / canvas.width;
   
-  const usablePageHeight = pageHeight - (2 * margin) - footerHeight;
-  let heightLeft = imgHeight;
-  let position = margin; // Start at top margin
-  let pageNum = 1;
+  let yPosition = topMargin;
+  let remainingHeight = imgHeight;
+  let sourceY = 0;
+  let pageNumber = 1;
   
-  // First page
-  pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-  
-  // Add footer to first page
-  pdf.setFontSize(8);
-  pdf.setTextColor(100);
-  pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 8, { align: 'center' });
-  pdf.text(`${pageNum}/`, pageWidth - margin - 10, pageHeight - 8, { align: 'right' });
-  
-  heightLeft -= usablePageHeight;
-  
-  // Additional pages
-  while (heightLeft > 0) {
-    pageNum++;
-    position = -(pageNum - 1) * usablePageHeight + margin;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+  while (remainingHeight > 0) {
+    if (pageNumber > 1) {
+      pdf.addPage();
+      yPosition = topMargin;
+    }
+    
+    // Calculate how much content fits on this page
+    const heightOnThisPage = Math.min(contentHeight, remainingHeight);
+    const sourceHeight = (heightOnThisPage / imgWidth) * canvas.width;
+    
+    // Create a canvas for just this page's content
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = sourceHeight;
+    const pageContext = pageCanvas.getContext('2d');
+    
+    if (pageContext) {
+      pageContext.drawImage(
+        canvas,
+        0, sourceY,
+        canvas.width, sourceHeight,
+        0, 0,
+        canvas.width, sourceHeight
+      );
+      
+      const pageImgData = pageCanvas.toDataURL('image/png');
+      pdf.addImage(pageImgData, 'PNG', sideMargin, yPosition, imgWidth, heightOnThisPage);
+    }
     
     // Add footer
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 8, { align: 'center' });
-    pdf.text(`${pageNum}/`, pageWidth - margin - 10, pageHeight - 8, { align: 'right' });
+    pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text(`Page ${pageNumber}`, pageWidth - sideMargin, pageHeight - 10, { align: 'right' });
     
-    heightLeft -= usablePageHeight;
-  }
-  
-  // Update all footers with total page count
-  const totalPages = pageNum;
-  for (let i = 1; i <= totalPages; i++) {
-    pdf.setPage(i);
-    pdf.text(`${i}/${totalPages}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+    sourceY += sourceHeight;
+    remainingHeight -= heightOnThisPage;
+    pageNumber++;
   }
   
   pdf.save(`PreVetScan-${Date.now()}.pdf`);
