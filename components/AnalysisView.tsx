@@ -72,19 +72,48 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
     const element = document.getElementById('analysis-content');
     if (!element) return;
 
+    // Better canvas rendering settings
     const canvas = await html2canvas(element, {
       scale: 2,
       logging: false,
-      useCORS: true
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: 1200,
+      windowHeight: element.scrollHeight
     });
 
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
     
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth - 20; // 10mm margins
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    let heightLeft = imgHeight;
+    let position = 10; // Start 10mm from top
+    
+    // Add content (split across pages if needed)
+    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+    
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight + 10;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+    
+    // Add footer to every page
+    const pageCount = pdf.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+      pdf.text('PreVetScan.com - AI-powered pet health screening', pdfWidth / 2, pdfHeight - 10, { align: 'center' });
+      pdf.text(`Page ${i} of ${pageCount}`, pdfWidth - 20, pdfHeight - 10);
+    }
+    
     pdf.save(`PreVetScan-Analysis-${Date.now()}.pdf`);
   };
 
@@ -251,13 +280,24 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* PDF Export Button - OUTSIDE the analysis-content div */}
-            <div className="mt-6 flex gap-3">
-              <Button onClick={exportToPDF} variant="secondary" className="flex-1">
+            {/* Action Buttons - OUTSIDE the analysis-content div */}
+            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+              <Button onClick={exportToPDF} variant="secondary" className="flex-1 justify-center">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Download as PDF
+                Download PDF
+              </Button>
+              
+              <Button 
+                onClick={() => alert('Email feature coming soon!')} 
+                variant="outline" 
+                className="flex-1 justify-center border-teal-300 text-teal-700 hover:bg-teal-50"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email to Vet
               </Button>
             </div>
           </div>
