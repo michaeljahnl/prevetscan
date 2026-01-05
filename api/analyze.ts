@@ -22,37 +22,47 @@ export default async function handler(req: Request) {
 
     const prompt = `You are an expert veterinary AI assistant analyzing a pet's ${category}.
 
-PROVIDE A COMPREHENSIVE ANALYSIS INCLUDING:
-1. Detailed visual observations (colors, textures, shapes, symmetry, abnormalities)
-2. Multiple possible causes (list 2-3 differential considerations - what this COULD be)
-3. What a veterinarian would examine further during an in-person visit
-4. Specific questions the owner should ask their vet
-5. Urgency level and timeline for veterinary consultation
+PROVIDE A COMPREHENSIVE, STRUCTURED ANALYSIS.
 
-CRITICAL LEGAL REQUIREMENTS:
-- NEVER make definitive diagnoses
-- ALWAYS use phrases like "consistent with," "may indicate," "warrants examination for," "could suggest"
-- List MULTIPLE possibilities, never single conclusions
-- Emphasize that ONLY in-person veterinary examination can diagnose
-- Be thorough but cautious
-
-FINANCIAL FORECASTING:
-Compare early intervention costs vs delayed treatment costs with specific dollar ranges.
-Example: "Addressing this now ($100-$500) prevents potential complications later ($800-$3000+)."
-
-Provide your response as valid JSON:
+Provide your response as valid JSON with this EXACT structure:
 {
   "severity": "Healthy|Low|Moderate|High|Critical",
-  "title": "Brief clinical summary (e.g., 'Inflamed Lesion Requiring Veterinary Assessment')",
+  "title": "Brief clinical summary (e.g., 'Severe Ulcerative Paw Lesion Requiring Urgent Assessment')",
   "observations": [
-    "Detailed observation 1 with specifics",
-    "Detailed observation 2 with specifics",
-    "Detailed observation 3 with specifics"
+    "Specific visual detail 1",
+    "Specific visual detail 2",
+    "Specific visual detail 3",
+    "Specific visual detail 4"
   ],
-  "recommendation": "Comprehensive guidance including: urgency timeline, what vet will examine, questions to ask, and next steps. Use cautious language: 'may indicate', 'consistent with', 'warrants examination'. Include 2-3 possible causes.",
-  "disclaimer": "This AI analysis is for informational purposes only and is not a veterinary diagnosis. Only a licensed veterinarian can diagnose your pet through in-person examination. Seek immediate veterinary care if you observe concerning symptoms.",
-  "financialForecast": "Specific cost comparison with ranges (e.g., early treatment $X-Y vs delayed treatment $Z+)"
-}`;
+  "possibleCauses": [
+    "**Cause 1 Name**: Brief explanation of this possibility",
+    "**Cause 2 Name**: Brief explanation of this possibility",
+    "**Cause 3 Name**: Brief explanation of this possibility"
+  ],
+  "vetWillExamine": [
+    "Comprehensive physical examination focusing on...",
+    "Diagnostic tests such as...",
+    "Assessment of..."
+  ],
+  "questionsToAsk": [
+    "What are the most probable causes based on your clinical assessment?",
+    "What specific diagnostic tests do you recommend?",
+    "What is the proposed treatment plan and timeline?",
+    "What signs should I monitor that indicate improvement or worsening?"
+  ],
+  "urgency": "Clear timeline: 'Immediate (within 4 hours)' or 'Urgent (within 24-48 hours)' or 'Schedule soon (within 1 week)' or 'Routine checkup'",
+  "nextSteps": "Brief guidance on immediate care at home before vet visit",
+  "financialForecast": "Early treatment: $X-Y range. Delayed complications: $Z+ range. Include specific procedures.",
+  "disclaimer": "This AI analysis is for informational purposes only and is not a veterinary diagnosis. Only a licensed veterinarian can diagnose your pet through in-person examination. Seek immediate veterinary care if you observe concerning symptoms."
+}
+
+CRITICAL LEGAL REQUIREMENTS:
+- Use cautious language: "consistent with," "may indicate," "warrants examination for," "could suggest"
+- List MULTIPLE possibilities in possibleCauses
+- Never make definitive diagnoses
+- Emphasize professional examination is required
+
+Keep each array item concise (1-2 sentences max) for readability.`;
 
     const result = await model.generateContent([
       prompt,

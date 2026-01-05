@@ -7,12 +7,16 @@ export enum HealthCategory {
 }
 
 export interface AnalysisResult {
-  severity: 'Low' | 'Moderate' | 'High' | 'Critical' | 'Healthy';
+  severity: string;
   title: string;
   observations: string[];
-  recommendation: string;
+  possibleCauses: string[];
+  vetWillExamine: string[];
+  questionsToAsk: string[];
+  urgency: string;
+  nextSteps: string;
   disclaimer: string;
-  financialForecast: string; // New field for cost-saving estimation
+  financialForecast: string;
 }
 
 export interface ChatMessage {
