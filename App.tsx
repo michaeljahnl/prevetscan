@@ -1,183 +1,130 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import AnalysisView from './components/AnalysisView';
 import ChatInterface from './components/ChatInterface';
+import Auth from './components/Auth';
 import Button from './components/Button';
+import { AppState } from './types';
 
-type View = 'home' | 'analysis' | 'chat';
+function App() {
+  const [appState, setAppState] = useState<AppState>({ view: 'home' });
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('home');
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-  return (
-    <div className="min-h-screen flex flex-col font-sans">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center cursor-pointer" onClick={() => setCurrentView('home')}>
-              <div className="bg-teal-600 rounded-lg p-1.5 mr-2">
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setAppState({ view: 'home' });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth onAuthSuccess={() => setAppState({ view: 'home' })} />;
+  }
+
+  // Home view (inline landing page)
+  if (appState.view === 'home') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-12">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
               </div>
-              <span className="font-bold text-xl text-slate-800 tracking-tight">Pre Vet Scan</span>
+              <h1 className="text-3xl font-bold text-slate-800">PreVetScan</h1>
             </div>
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => setCurrentView('home')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'home' ? 'text-teal-600 bg-teal-50' : 'text-slate-600 hover:text-teal-600'}`}
-              >
-                Home
-              </button>
-              <button 
-                onClick={() => setCurrentView('analysis')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'analysis' ? 'text-teal-600 bg-teal-50' : 'text-slate-600 hover:text-teal-600'}`}
-              >
-                Checkup
-              </button>
-              <button 
-                onClick={() => setCurrentView('chat')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === 'chat' ? 'text-teal-600 bg-teal-50' : 'text-slate-600 hover:text-teal-600'}`}
-              >
-                Chat
-              </button>
-            </div>
+            <button
+              onClick={handleSignOut}
+              className="text-sm text-slate-600 hover:text-slate-800 bg-white px-4 py-2 rounded-lg shadow"
+            >
+              Sign Out
+            </button>
           </div>
-        </div>
-      </nav>
 
-      {/* Main Content */}
-      <main className="flex-grow bg-slate-50">
-        {currentView === 'home' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-6">
-                Don't wait for the claim denial. <br />
-                <span className="text-teal-600">Prevent the bill.</span>
-              </h1>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                Traditional insurance reacts after your pet is sick. We use AI visual analysis to catch issues early, saving you thousands in surgery costs that insurance might not even cover.
+          {/* Hero Section */}
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">
+              Don't wait for the claim denial.<br />
+              <span className="text-teal-600">Prevent the bill.</span>
+            </h2>
+            <p className="text-xl text-slate-600 mb-8">
+              AI-powered health screening for your pet. Know what you're looking at before the vet visit.
+            </p>
+          </div>
+
+          {/* Action Cards */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow">
+              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-3">Health Checkup</h3>
+              <p className="text-slate-600 mb-6">
+                Upload a photo of your pet's teeth, skin, eyes, or gait for an AI-powered health assessment.
               </p>
-              <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <Button onClick={() => setCurrentView('analysis')} className="text-lg px-8 shadow-teal-500/30">
-                  Start Health Scan
-                </Button>
-                <Button variant="secondary" onClick={() => setCurrentView('chat')} className="text-lg px-8">
-                  Get Unbiased Opinion
-                </Button>
-              </div>
+              <Button onClick={() => setAppState({ view: 'analysis' })} className="w-full">
+                Start Checkup
+              </Button>
             </div>
 
-            {/* Differentiator Comparison */}
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100 mb-20">
-              <div className="grid md:grid-cols-2">
-                <div className="p-8 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-100">
-                   <h3 className="text-lg font-bold text-slate-500 mb-4 uppercase tracking-wider">Traditional Insurance</h3>
-                   <ul className="space-y-4">
-                     <li className="flex items-center text-slate-500">
-                       <svg className="w-5 h-5 mr-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                       Reacts only after pet is sick
-                     </li>
-                     <li className="flex items-center text-slate-500">
-                       <svg className="w-5 h-5 mr-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                       Incentivized to deny claims
-                     </li>
-                     <li className="flex items-center text-slate-500">
-                       <svg className="w-5 h-5 mr-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                       Paperwork & waiting periods
-                     </li>
-                   </ul>
-                </div>
-                <div className="p-8 bg-teal-50/50">
-                   <h3 className="text-lg font-bold text-teal-800 mb-4 uppercase tracking-wider">Pre Vet Scan</h3>
-                   <ul className="space-y-4">
-                     <li className="flex items-center text-slate-800 font-medium">
-                       <svg className="w-5 h-5 mr-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                       Proactive prevention & early detection
-                     </li>
-                     <li className="flex items-center text-slate-800 font-medium">
-                       <svg className="w-5 h-5 mr-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                       Unbiased "Second Opinion" AI
-                     </li>
-                     <li className="flex items-center text-slate-800 font-medium">
-                       <svg className="w-5 h-5 mr-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
-                       Instant triage & Financial Forecasting
-                     </li>
-                   </ul>
-                </div>
+            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
               </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              <FeatureCard 
-                icon="🦷"
-                title="Dental Health" 
-                desc="Snap a photo of teeth. We calculate the cost savings of treating gingivitis now vs extraction later." 
-              />
-              <FeatureCard 
-                icon="👁️"
-                title="Eye Clarity" 
-                desc="Monitor cloudiness or discharge. Get instant feedback on whether it's an emergency." 
-              />
-              <FeatureCard 
-                icon="⚖️"
-                title="Unbiased Advice" 
-                desc="Our AI has no financial stake in your pet's care. Just pure, data-driven health guidance." 
-              />
-            </div>
-            
-             <div className="mt-20 bg-white rounded-2xl p-8 shadow-xl border border-slate-100 flex flex-col md:flex-row items-center">
-              <div className="md:w-1/2 mb-8 md:mb-0 md:pr-8">
-                <span className="text-teal-600 font-bold uppercase tracking-wider text-sm mb-2 block">Deep Reasoning Mode</span>
-                <h3 className="text-2xl font-bold text-slate-900 mb-4">Complex questions? We think deeper.</h3>
-                <p className="text-slate-600 mb-6">
-                  Our new 'Deep Thinking' chat mode uses advanced reasoning (Gemini 3 Pro) to tackle complicated health histories and symptoms that simple bots miss.
-                </p>
-                <Button variant="outline" onClick={() => setCurrentView('chat')}>Try Thinking Mode</Button>
-              </div>
-              <div className="md:w-1/2 bg-slate-100 rounded-xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-teal-100 rounded-full opacity-50"></div>
-                 <div className="space-y-3">
-                   <div className="bg-white p-3 rounded-lg rounded-tl-none shadow-sm text-sm text-slate-700 w-3/4">
-                     My vet quoted $3000 for TPLO surgery. Is this standard?
-                   </div>
-                   <div className="bg-teal-600 p-3 rounded-lg rounded-tr-none shadow-sm text-sm text-white w-5/6 ml-auto">
-                     <div className="flex items-center text-teal-100 text-xs mb-1">
-                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/></svg>
-                        Unbiased Analysis...
-                     </div>
-                     TPLO ranges $2500-$5500 nationwide. $3k is reasonable. However, have you considered conservative management/CM? For dogs under 40lbs, success rate is...
-                   </div>
-                 </div>
-              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-3">Chat with Nora</h3>
+              <p className="text-slate-600 mb-6">
+                Ask Nora questions about symptoms, audit vet quotes, or get second opinions on treatment options.
+              </p>
+              <Button onClick={() => setAppState({ view: 'chat' })} variant="secondary" className="w-full">
+                Start Chat
+              </Button>
             </div>
           </div>
-        )}
-
-        {currentView === 'analysis' && <AnalysisView onBack={() => setCurrentView('home')} />}
-        
-        {currentView === 'chat' && <ChatInterface onBack={() => setCurrentView('home')} />}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="mb-2">© 2024 Pre Vet Scan.</p>
-          <p className="text-sm">
-            Disclaimer: This tool provides information, not medical diagnosis. Always consult a veterinarian for medical advice.
-          </p>
         </div>
-      </footer>
+      </div>
+    );
+  }
+
+  // Other views
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100">
+      {appState.view === 'analysis' && (
+        <AnalysisView onBack={() => setAppState({ view: 'home' })} />
+      )}
+      {appState.view === 'chat' && (
+        <ChatInterface onBack={() => setAppState({ view: 'home' })} />
+      )}
     </div>
   );
-};
-
-const FeatureCard: React.FC<{ icon: string; title: string; desc: string }> = ({ icon, title, desc }) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-    <div className="text-4xl mb-4">{icon}</div>
-    <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
-    <p className="text-slate-600">{desc}</p>
-  </div>
-);
+}
 
 export default App;
