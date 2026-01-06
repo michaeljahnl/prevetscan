@@ -13,7 +13,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
     {
       id: 'welcome',
       role: 'model',
-      text: "Hello! I'm your AI Vet Assistant. I can check symptoms or **audit vet quotes** for fair pricing. How can I help?",
+      text: "Hello! I'm Nora, your AI Vet Assistant. I can check symptoms or **audit vet quotes** for fair pricing. How can I help?",
       timestamp: Date.now()
     }
   ]);
@@ -139,7 +139,7 @@ const handleSend = async (e?: React.FormEvent) => {
              </svg>
           </Button>
           <div>
-            <h2 className="font-bold text-lg">Dr. AI Assistant</h2>
+            <h2 className="font-bold text-lg">Nora, AI Vet Assistant</h2>
             <div className="flex items-center text-xs text-slate-300 space-x-2">
               <span className="flex items-center">
                 <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
