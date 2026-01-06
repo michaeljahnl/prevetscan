@@ -3,11 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+console.log('Supabase init:', {
+  url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
+  key: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 10)}...` : 'MISSING'
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    url: supabaseUrl ? '✓' : '✗ VITE_SUPABASE_URL',
-    key: supabaseAnonKey ? '✓' : '✗ VITE_SUPABASE_ANON_KEY'
-  });
   throw new Error(`Missing Supabase env vars. URL: ${supabaseUrl ? 'set' : 'MISSING'}, Key: ${supabaseAnonKey ? 'set' : 'MISSING'}`);
 }
 
