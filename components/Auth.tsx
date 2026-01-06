@@ -37,19 +37,25 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           setMessage('Success! Check your email to confirm your account.');
         }
       } else {
+        console.log('Attempting sign in with:', email);
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password
         });
 
-        if (error) throw error;
+        console.log('Auth response:', { error, userExists: !!data?.user });
+        if (error) {
+          console.error('Auth error:', error);
+          throw error;
+        }
         
         if (data.user) {
           onAuthSuccess();
         }
       }
     } catch (error: any) {
-      setMessage(error.message || 'Authentication failed');
+      console.error('Full error object:', error);
+      setMessage(error.message || error.toString() || 'Authentication failed');
     } finally {
       setLoading(false);
     }
