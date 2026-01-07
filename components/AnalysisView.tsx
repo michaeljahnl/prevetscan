@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Turnstile } from '@marsidev/react-turnstile';
+import { supabase } from '../lib/supabase';
 import { HealthCategory, AnalysisResult } from '../types';
-import { analyzePetImage } from '../services/geminiService';
 import Button from './Button';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -14,7 +15,37 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string) ?? '';
+
+  useEffect(() => {
+    fetchCredits();
+  }, []);
+
+  const fetchCredits = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/check-credits', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCredits(data.credits);
+      }
+    } catch (error) {
+      console.error('Failed to fetch credits:', error);
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -24,6 +55,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
         const base64String = reader.result as string;
         setImagePreview(base64String);
         setResult(null);
+        setErrorMessage(null);
+        setTurnstileToken(null);
       };
       reader.readAsDataURL(file);
     }
@@ -31,27 +64,66 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
 
   const handleAnalyze = async () => {
     if (!imagePreview) return;
-    
+
+    // Check credits first
+    if (credits !== null && credits <= 0) {
+      setShowPaywall(true);
+      return;
+    }
+
+    // If Turnstile is configured, require token
+    if (turnstileSiteKey && !turnstileToken) {
+      setErrorMessage('Please confirm you are human before running the scan.');
+      return;
+    }
+
     setIsAnalyzing(true);
+    setErrorMessage(null);
+    setShowPaywall(false);
+
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setErrorMessage('Please sign in to continue');
+        return;
+      }
+
       const base64Data = imagePreview.split(',')[1];
-      
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          image: base64Data, 
-          category: category 
-        })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          image: base64Data,
+          category,
+          turnstileToken: turnstileToken || 'dummy',
+        }),
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
-      
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 402) {
+        // Out of credits
+        setShowPaywall(true);
+        setCredits(0);
+        return;
+      }
+
+      if (!response.ok) {
+        const msg = data?.error || data?.details || 'Analysis failed';
+        throw new Error(msg);
+      }
+
       setResult(data);
-    } catch (error) {
-      console.error("Analysis failed", error);
-      alert("Something went wrong with the analysis. Please try again.");
+      setCredits(data.remainingCredits ?? credits);
+      setTurnstileToken(null);
+      
+    } catch (error: any) {
+      console.error('Analysis failed', error);
+      setErrorMessage(error?.message || 'Something went wrong with the analysis. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -68,88 +140,132 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
     }
   };
 
- const exportToPDF = async () => {
-  const element = document.getElementById('analysis-content');
-  if (!element) return;
+  const exportToPDF = async () => {
+    const element = document.getElementById('analysis-content');
+    if (!element) return;
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    logging: false,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    windowHeight: element.scrollHeight
-  });
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowHeight: element.scrollHeight
+    });
 
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  
-  // Generous margins
-  const topMargin = 20;
-  const bottomMargin = 20;
-  const sideMargin = 15;
-  
-  const contentWidth = pageWidth - (2 * sideMargin);
-  const contentHeight = pageHeight - topMargin - bottomMargin;
-  
-  const imgWidth = contentWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  
-  let yPosition = topMargin;
-  let remainingHeight = imgHeight;
-  let sourceY = 0;
-  let pageNumber = 1;
-  
-  while (remainingHeight > 0) {
-    if (pageNumber > 1) {
-      pdf.addPage();
-      yPosition = topMargin;
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const topMargin = 20;
+    const bottomMargin = 20;
+    const sideMargin = 15;
+
+    const contentWidth = pageWidth - (2 * sideMargin);
+    const contentHeight = pageHeight - topMargin - bottomMargin;
+
+    const imgWidth = contentWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let yPosition = topMargin;
+    let remainingHeight = imgHeight;
+    let sourceY = 0;
+    let pageNumber = 1;
+
+    while (remainingHeight > 0) {
+      if (pageNumber > 1) {
+        pdf.addPage();
+        yPosition = topMargin;
+      }
+
+      const heightOnThisPage = Math.min(contentHeight, remainingHeight);
+      const sourceHeight = (heightOnThisPage / imgWidth) * canvas.width;
+
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sourceHeight;
+      const pageContext = pageCanvas.getContext('2d');
+
+      if (pageContext) {
+        pageContext.drawImage(
+          canvas,
+          0, sourceY,
+          canvas.width, sourceHeight,
+          0, 0,
+          canvas.width, sourceHeight
+        );
+
+        const pageImgData = pageCanvas.toDataURL('image/png');
+        pdf.addImage(pageImgData, 'PNG', sideMargin, yPosition, imgWidth, heightOnThisPage);
+      }
+
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+      pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.text(`Page ${pageNumber}`, pageWidth - sideMargin, pageHeight - 10, { align: 'right' });
+
+      sourceY += sourceHeight;
+      remainingHeight -= heightOnThisPage;
+      pageNumber++;
     }
-    
-    // Calculate how much content fits on this page
-    const heightOnThisPage = Math.min(contentHeight, remainingHeight);
-    const sourceHeight = (heightOnThisPage / imgWidth) * canvas.width;
-    
-    // Create a canvas for just this page's content
-    const pageCanvas = document.createElement('canvas');
-    pageCanvas.width = canvas.width;
-    pageCanvas.height = sourceHeight;
-    const pageContext = pageCanvas.getContext('2d');
-    
-    if (pageContext) {
-      pageContext.drawImage(
-        canvas,
-        0, sourceY,
-        canvas.width, sourceHeight,
-        0, 0,
-        canvas.width, sourceHeight
-      );
-      
-      const pageImgData = pageCanvas.toDataURL('image/png');
-      pdf.addImage(pageImgData, 'PNG', sideMargin, yPosition, imgWidth, heightOnThisPage);
-    }
-    
-    // Add footer
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    pdf.text('PreVetScan.com', pageWidth / 2, pageHeight - 10, { align: 'center' });
-    pdf.text(`Page ${pageNumber}`, pageWidth - sideMargin, pageHeight - 10, { align: 'right' });
-    
-    sourceY += sourceHeight;
-    remainingHeight -= heightOnThisPage;
-    pageNumber++;
-  }
-  
-  pdf.save(`PreVetScan-${Date.now()}.pdf`);
-};
+
+    pdf.save(`PreVetScan-${Date.now()}.pdf`);
+  };
+
+  const canRunScan =
+    !!imagePreview &&
+    !isAnalyzing &&
+    (credits === null || credits > 0) &&
+    (!turnstileSiteKey || !!turnstileToken);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <Button variant="outline" onClick={onBack} className="mb-6 !py-2 !px-3 text-sm">
-        ← Back to Home
-      </Button>
+      {/* Header with Back Button + Credits */}
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="outline" onClick={onBack} className="!py-2 !px-3 text-sm">
+          ← Back to Home
+        </Button>
+        
+        {credits !== null && (
+          <div className="bg-white px-4 py-2 rounded-lg shadow border border-teal-200">
+            <span className="text-sm font-medium text-slate-600">Credits: </span>
+            <span className={`text-lg font-bold ${credits > 0 ? 'text-teal-600' : 'text-red-600'}`}>
+              {credits}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Out of Credits</h3>
+              <p className="text-slate-600 mb-6">
+                You've used all your free scans. Purchase more credits to continue using PreVetScan.
+              </p>
+              <div className="space-y-3">
+                <Button className="w-full" onClick={() => alert('Stripe payment coming soon!')}>
+                  Buy Credits
+                </Button>
+                <button 
+                  onClick={() => setShowPaywall(false)}
+                  className="w-full text-sm text-slate-600 hover:text-slate-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
         <div className="p-6 md:p-8">
@@ -166,8 +282,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                     key={cat}
                     onClick={() => setCategory(cat)}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
-                      category === cat 
-                        ? 'bg-teal-50 border-teal-500 text-teal-700' 
+                      category === cat
+                        ? 'bg-teal-50 border-teal-500 text-teal-700'
                         : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300'
                     }`}
                   >
@@ -181,15 +297,17 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors relative">
               {imagePreview ? (
                 <div className="relative inline-block">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
-                    className="max-h-64 rounded-lg shadow-md mx-auto" 
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="max-h-64 rounded-lg shadow-md mx-auto"
                   />
-                  <button 
+                  <button
                     onClick={() => {
                       setImagePreview(null);
                       setResult(null);
+                      setErrorMessage(null);
+                      setTurnstileToken(null);
                     }}
                     className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 shadow-lg hover:bg-red-600 transition-colors"
                   >
@@ -199,8 +317,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                   </button>
                 </div>
               ) : (
-                <div 
-                  onClick={() => fileInputRef.current?.click()} 
+                <div
+                  onClick={() => fileInputRef.current?.click()}
                   className="cursor-pointer flex flex-col items-center justify-center space-y-3"
                 >
                   <div className="w-16 h-16 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-2">
@@ -213,33 +331,65 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                   <p className="text-sm text-slate-400">Supports JPG, PNG (Max 5MB)</p>
                 </div>
               )}
-              <input 
+              <input
                 ref={fileInputRef}
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleFileChange} 
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
               />
             </div>
 
+            {/* Turnstile */}
+            {imagePreview && (
+              <div className="flex justify-center">
+                {turnstileSiteKey ? (
+                  <Turnstile
+                    siteKey={turnstileSiteKey}
+                    onSuccess={(token) => {
+                      setTurnstileToken(token);
+                      setErrorMessage(null);
+                    }}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken(null)}
+                  />
+                ) : (
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    Turnstile is not configured (<code>VITE_TURNSTILE_SITE_KEY</code> missing). Scans will still run,
+                    but you'll be vulnerable to spam.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Error message */}
+            {errorMessage && (
+              <div className="p-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+                {errorMessage}
+              </div>
+            )}
+
             {/* Action Button */}
             <div className="flex justify-end">
-              <Button 
-                disabled={!imagePreview} 
-                onClick={handleAnalyze} 
+              <Button
+                disabled={!canRunScan}
+                onClick={handleAnalyze}
                 isLoading={isAnalyzing}
                 className="w-full md:w-auto"
               >
-                {isAnalyzing ? 'Analyzing...' : 'Run Health Check'}
+                {isAnalyzing ? 'Analyzing...' : credits === 0 ? 'No Credits' : 'Run Health Check'}
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Results Section */}
+        {/* Results Section - Keep all your existing display code */}
         {result && (
           <div className="bg-slate-50 border-t border-slate-100 p-6 md:p-8 animate-fade-in">
             <div id="analysis-content" className="space-y-6">
+              {/* [All your existing analysis display code - Header, Image, Title, etc.] */}
+              {/* Keeping your complete implementation */}
+              
               {/* Header */}
               <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-slate-200">
                 <div>
@@ -268,7 +418,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                   <span className="font-semibold">{result.urgency}</span>
                 </div>
               </div>
-              
+
               {/* Financial Forecast */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-lg border border-teal-200 shadow-sm">
                 <div className="flex items-center text-teal-800 font-bold text-lg mb-3">
@@ -387,10 +537,10 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
                 </svg>
                 Download PDF
               </Button>
-              
-              <Button 
-                onClick={() => alert('Email feature coming soon!')} 
-                variant="outline" 
+
+              <Button
+                onClick={() => alert('Email feature coming soon!')}
+                variant="outline"
                 className="flex-1 justify-center border-teal-300 text-teal-700 hover:bg-teal-50"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

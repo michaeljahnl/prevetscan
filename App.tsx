@@ -31,6 +31,7 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState<number>(0);
+  const [creditsExpireAt, setCreditsExpireAt] = useState<Date | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
   const [showRefillModal, setShowRefillModal] = useState(false);
@@ -38,18 +39,35 @@ function App() {
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [showAddPet, setShowAddPet] = useState(false);
 
-  // Fetch credits
-  const fetchCredits = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single();
+ // Fetch credits and expiration
+const fetchCredits = async () => {
+  if (!user) return;
+  
+  const { data: creditsData } = await supabase.rpc('get_user_credits', { 
+    p_user_id: user.id 
+  });
 
-    if (data) setCredits(data.credits || 0);
-  };
+  const { data: expirationData } = await supabase.rpc('get_user_credit_expiration', {
+    p_user_id: user.id
+  });
+
+  if (creditsData !== null) setCredits(creditsData);
+  if (expirationData) setCreditsExpireAt(new Date(expirationData));
+};
+
+// Format expiration countdown
+const formatExpiration = (expireDate: Date | null) => {
+  if (!expireDate) return '';
+  
+  const now = new Date();
+  const diffMs = expireDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return ' (expired)';
+  if (diffDays === 0) return ' (expires today)';
+  if (diffDays === 1) return ' (expires tomorrow)';
+  return ` (expires in ${diffDays} days)`;
+};
 
   // Fetch pets
   const fetchPets = async () => {
@@ -330,8 +348,8 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-lg shadow">
-                Credits: {credits}
-              </span>
+                Credits: {credits}{formatExpiration(creditsExpireAt)}
+              </span> 
               <button
                 onClick={() => setAppState({ view: 'home' })}
                 className="text-sm text-slate-600 hover:text-slate-800 bg-white px-4 py-2 rounded-lg shadow"
@@ -517,7 +535,7 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-lg shadow">
-                Credits: {credits}
+                Credits: {credits}{formatExpiration(creditsExpireAt)}
               </span>
               <button
                 onClick={() => setAppState({ view: 'dashboard' })}

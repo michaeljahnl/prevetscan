@@ -190,7 +190,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
         {!isSignUp && (
           <div className="mt-4 pt-4 border-t border-slate-200 text-center">
-            <p className="text-xs text-slate-500">New users get 1 free scan to try PreVetScan!</p>
+            <p className="text-xs text-slate-500">New users get 3 free scan to try PreVetScan!</p>
           </div>
         )}
       </div>
