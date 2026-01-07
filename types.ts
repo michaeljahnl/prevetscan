@@ -29,6 +29,6 @@
   }
 
   export interface AppState {
-    view: 'home' | 'analysis' | 'chat';
+    view: 'home' | 'analysis' | 'chat' | 'dashboard';
     selectedCategory?: HealthCategory;
   }
