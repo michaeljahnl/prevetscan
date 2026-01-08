@@ -19,12 +19,15 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [pets, setPets] = useState<any[]>([]);
+  const [selectedPetId, setSelectedPetId] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string) ?? '';
 
   useEffect(() => {
     fetchCredits();
+    fetchPets();
   }, []);
 
   const fetchCredits = async () => {
@@ -44,6 +47,23 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error);
+    }
+  };
+
+  const fetchPets = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (data) setPets(data);
+    } catch (error) {
+      console.error('Failed to fetch pets:', error);
     }
   };
 
@@ -99,6 +119,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
         body: JSON.stringify({
           image: base64Data,
           category,
+          petId: selectedPetId || null,
           turnstileToken: turnstileToken || 'dummy',
         }),
       });
@@ -273,6 +294,27 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
           <p className="text-slate-500 mb-6">Select a category and upload a clear photo for AI analysis.</p>
 
           <div className="space-y-6">
+            {/* Pet Selection */}
+            {pets.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Which pet is this for?
+                </label>
+                <select
+                  value={selectedPetId}
+                  onChange={(e) => setSelectedPetId(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent text-slate-700 bg-white"
+                >
+                  <option value="">Select a pet (optional)</option>
+                  {pets.map((pet) => (
+                    <option key={pet.id} value={pet.id}>
+                      {pet.name} ({pet.species.charAt(0).toUpperCase() + pet.species.slice(1)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Category Selector */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Area of Concern</label>
@@ -383,13 +425,10 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Results Section - Keep all your existing display code */}
+        {/* Results Section */}
         {result && (
           <div className="bg-slate-50 border-t border-slate-100 p-6 md:p-8 animate-fade-in">
             <div id="analysis-content" className="space-y-6">
-              {/* [All your existing analysis display code - Header, Image, Title, etc.] */}
-              {/* Keeping your complete implementation */}
-              
               {/* Header */}
               <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-slate-200">
                 <div>
