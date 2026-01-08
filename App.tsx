@@ -251,20 +251,22 @@ const formatExpiration = (expireDate: Date | null) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Species</label>
-            <select
-              name="species"
-              defaultValue={editingPet?.species || 'Dog'}
-              required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              <option value="Dog">Dog</option>
-              <option value="Cat">Cat</option>
-              <option value="Bird">Bird</option>
-              <option value="Rabbit">Rabbit</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+  <label className="block text-sm font-medium text-slate-700 mb-2">Species</label>
+  <select
+    name="species"
+    defaultValue={editingPet?.species || 'dog'}
+    required
+    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+  >
+    <option value="dog">Dog</option>
+    <option value="cat">Cat</option>
+    <option value="bird">Bird</option>
+    <option value="small_mammal">Small Mammal (Rabbit, Guinea Pig, etc.)</option>
+    <option value="reptile">Reptile</option>
+    <option value="fish">Fish</option>
+    <option value="other">Other</option>
+  </select>
+</div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Breed</label>
             <input
@@ -439,7 +441,7 @@ const formatExpiration = (expireDate: Date | null) => {
                           <div>
                             <h3 className="font-bold text-slate-900 text-lg">{pet.name}</h3>
                             <p className="text-slate-600 text-sm">
-                              {pet.species} {pet.breed && `• ${pet.breed}`}
+                              {pet.species.charAt(0).toUpperCase() + pet.species.slice(1).replace('_', ' ')} {pet.breed && `• ${pet.breed}`}
                             </p>
                             <p className="text-slate-500 text-sm mt-1">
                               {pet.age_years > 0 && `${pet.age_years}y `}
